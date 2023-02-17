@@ -4,7 +4,7 @@ from typing import Callable, Dict, Optional, Union
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.types import ASGIApp
@@ -41,7 +41,13 @@ class SQLAlchemyMiddleware(BaseHTTPMiddleware):
             engine = custom_engine
 
         global _Session
-        _Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, **session_args)
+        _Session = sessionmaker(
+            engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            sync_session_class=Session,
+            **session_args,
+        )
 
         if bind_events:
             bind_events(_Session)
