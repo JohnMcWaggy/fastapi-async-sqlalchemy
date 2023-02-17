@@ -1,5 +1,5 @@
 from contextvars import ContextVar
-from typing import Dict, Optional, Union
+from typing import Callable, Dict, Optional, Union
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import URL
@@ -11,6 +11,8 @@ from starlette.types import ASGIApp
 
 from fastapi_async_sqlalchemy.exceptions import MissingSessionError, SessionNotInitialisedError
 
+SessionEventBinder = Callable[[sessionmaker], None]
+
 _Session: Optional[sessionmaker] = None
 _session: ContextVar[Optional[AsyncSession]] = ContextVar("_session", default=None)
 
@@ -21,9 +23,10 @@ class SQLAlchemyMiddleware(BaseHTTPMiddleware):
         app: ASGIApp,
         db_url: Optional[Union[str, URL]] = None,
         custom_engine: Optional[Engine] = None,
-        engine_args: Dict = None,
-        session_args: Dict = None,
+        engine_args: Optional[Dict] = None,
+        session_args: Optional[Dict] = None,
         commit_on_exit: bool = False,
+        bind_events: Optional[SessionEventBinder] = None,
     ):
         super().__init__(app)
         self.commit_on_exit = commit_on_exit
@@ -39,6 +42,9 @@ class SQLAlchemyMiddleware(BaseHTTPMiddleware):
 
         global _Session
         _Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, **session_args)
+
+        if bind_events:
+            bind_events(_Session)
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
         async with db(commit_on_exit=self.commit_on_exit):
